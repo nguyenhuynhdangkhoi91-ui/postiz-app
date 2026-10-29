@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 This project is Postiz, a tool to schedule social media and chat posts to 28+ channels.
 You can add posts to the calendar, they will be added into a workflow and posted at the right time.
 You can find things like:
@@ -13,8 +17,27 @@ We have 3 important folders
 
 - apps/backend - this is where the API code is (NESTJS)
 - apps/orchestrator - this is temporal, it's for background jobs (NESTJS) it contains all the workflows and activities
-- apps/frontend - this is the code of the frontend (Vite ReactJS)
+- apps/frontend - this is the code of the frontend (Next.js, `next dev -p 4200`; read `apps/frontend/AGENTS.md` and the docs in `node_modules/next/dist/docs/` before touching Next-specific APIs, this version has breaking changes)
 - /libraries contains a lot of services shared between backend and orchestrator and frontend components.
+
+## Commands
+
+Run everything from the repo root (Node >=22.12 <23, pnpm 10).
+- `pnpm install` (postinstall runs `prisma-generate`)
+- `pnpm run dev` runs extension + orchestrator + backend + frontend; `pnpm run dev-backend` runs only backend + frontend; single app: `pnpm run dev:backend|dev:frontend|dev:orchestrator`
+- `pnpm run build` builds frontend, backend and orchestrator (`build:backend`, `build:frontend`, `build:orchestrator` for one)
+- `pnpm run dev:docker` starts the dev infra (Postgres, Redis, Temporal) from `docker-compose.dev.yaml`
+- Prisma schema: `libraries/nestjs-libraries/src/database/prisma/schema.prisma`; use `pnpm run prisma-generate` / `prisma-db-push` (production changes need a safe migration path)
+- `pnpm test` runs Jest through NX projects (`jest.config.ts`); there are currently few or no spec files
+- There is no `lint` script in package.json; ESLint config is `eslint.config.mjs` at the root. Keep `.env.example` updated when adding env vars.
+
+## Architecture notes
+
+- Backend entry points are `apps/backend/src/api` (internal API for the frontend) and `apps/backend/src/public-api` (public API); both are thin controllers over services in `libraries/nestjs-libraries`.
+- Social providers live in `libraries/nestjs-libraries/src/integrations/social/*.provider.ts`, extend `social.abstract.ts` and are registered through `integration.manager.ts`. Provider-specific behavior goes in the provider, never in generic code.
+- Scheduling runs on Temporal: workflows are in `apps/orchestrator/src/workflows` (post flows in `post-workflows/`), activities in `apps/orchestrator/src/activities`, shared registration helpers in `libraries/nestjs-libraries/src/temporal`. See the workflow versioning rules below.
+- Prisma repositories/services per domain are under `libraries/nestjs-libraries/src/database/prisma/<domain>`.
+- Other workspaces: `apps/extension` (Chrome extension, Vite), `apps/sdk` (published Node SDK), `apps/commands` (CLI commands).
 
 We are using only pnpm, don't use any other dependency manager.
 Never install frontend components from npmjs, focus on writing native components.
